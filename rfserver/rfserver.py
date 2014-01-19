@@ -275,6 +275,25 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
                                                 format_id(entry.dp_id),
                                                 entry.dp_port))
 
+    def send_transit_lsp_message(self, ct_id, dp_id):
+        rm = RouteMod(RMT_ADD, dp_id)
+	lsps = self.lspconf.get_dp_entries(dp_id = dp_id)
+        for r in lsps:
+            rm.set_id(int(r.dp_id))
+	    rm.set_matches(None)
+	    rm.add_match(Match.ETHERTYPE(0x8847))
+            rm.add_match(Match.MPLS(r.lsp_label))
+            rm.set_actions(None)
+            rm.add_action(Action.PUSH_MPLS(r.lsp_label))
+            rm.add_action(Action.OUTPUT(r.dp_port))
+	    rm.set_options(None)
+            rm.add_option(Option.PRIORITY(PRIORITY_HIGH))
+	    rm.add_option(Option.CT_ID(ct_id))
+            self.ipc.send(RFSERVER_RFPROXY_CHANNEL, str(ct_id), rm)
+        return
+
+
+
     def send_datapath_config_message(self, ct_id, dp_id, operation_id):
         rm = RouteMod(RMT_ADD, dp_id)
 
@@ -357,6 +376,7 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
             self.send_datapath_config_message(ct_id, dp_id, DC_ICMPV6)
             self.send_datapath_config_message(ct_id, dp_id, DC_LDP_PASSIVE)
             self.send_datapath_config_message(ct_id, dp_id, DC_LDP_ACTIVE)
+	    self.send_transit_lsp_message(ct_id, dp_id)
             self.log.info("Configuring datapath (dp_id=%s)" % format_id(dp_id))
         return is_rfvs(dp_id)
 
