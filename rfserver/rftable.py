@@ -71,7 +71,7 @@ class RFLSPTable(EntryTable):
         result = self.get_entries(dp_id=dp_id,
                                   lsp_label=lsp_label)
 
-        if not result;
+        if not result:
             return None
         return result[0]
 
