@@ -32,10 +32,12 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
     def __init__(self, configfile, islconffile):
         self.config = RFConfig(configfile)
         self.islconf = RFISLConf(islconffile)
+        self.lspconf = RFLSPConfig(lspconffile)
 
         # Initialise state tables
         self.rftable = RFTable()
         self.isltable = RFISLTable()
+        self.lsptable = RFLSPTable()
 
         # Logging
         self.log = logging.getLogger("rfserver")
