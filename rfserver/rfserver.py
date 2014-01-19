@@ -29,7 +29,7 @@ REGISTER_ISL = 2
 
 
 class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
-    def __init__(self, configfile, islconffile):
+    def __init__(self, configfile, islconffile, lspconffile):
         self.config = RFConfig(configfile)
         self.islconf = RFISLConf(islconffile)
         self.lspconf = RFLSPConfig(lspconffile)
@@ -423,12 +423,14 @@ if __name__ == "__main__":
 
     config = os.path.dirname(os.path.realpath(__file__)) + "/config.csv"
     islconf = os.path.dirname(os.path.realpath(__file__)) + "/islconf.csv"
+    lspconf = os.path.dirname(os.path.realpath(__file__)) + "/lspconf.csv"
 
     parser = argparse.ArgumentParser(description=description, epilog=epilog)
     parser.add_argument('configfile', default=config,
                         help='VM-VS-DP mapping configuration file')
     parser.add_argument('-i', '--islconfig', default=islconf,
                         help='ISL mapping configuration file')
-
+    parser.add_argument('-l', '--lspconfig', default=lspconf,
+                        help='LSP configuration file')
     args = parser.parse_args()
-    RFServer(args.configfile, args.islconfig)
+    RFServer(args.configfile, args.islconfig, args.lspconfig)

@@ -80,20 +80,26 @@ class RFLSPConfig(EntryTable):
     def __init__(self, ifile):
         EntryTable.__init__(self, RFCONFIG_NAME, RFLSPCONFENTRY)
         # TODO: perform validation of config
-        configfile = file(ifile)
-        lines = configfile.readlines()[1:]
+	try:
+            lspconfigfile = file(ifile)
+        except:
+            # Default to no ISL config
+            return
+
+        lspconfigfile = file(ifile)
+        lines = lspconfigfile.readlines()[1:]
         entries = [line.strip("\n").split(",") for line in lines]
         for (a, b, c) in entries:
-            self.set_entry(RFConfigEntry(dp_id=int(a, 16), lsp_label=int(b),
+            self.set_entry(RFLSPConfEntry(dp_id=int(a, 16), lsp_label=int(b),
                                          dp_port=int(c)))
     
     def get_config_for_dp_id(self, dp_id, lsp_label):
         result = self.get_entries(dp_id=dp_id,
                                   lsp_label=lsp_label)
                                   
-                                  if not result;
-                                      return None
-                                  return result[0]
+        if not result:
+           return None
+        return result[0]
 
 
 class RFTable(EntryTable):
@@ -326,6 +332,7 @@ class RFEntry:
 
 class RFLSPEntry:
     def __init__(self, dp_id=None, lsp_label=None, dp_port=None):
+        self.id = None
         self.dp_id = dp_id
         self.lsp_label = lsp_label
         self.dp_port = dp_port
@@ -335,17 +342,28 @@ class RFLSPEntry:
     def __str__(self):
         return "dp_id: %s\nlsp_label: %s\n"\
             "dp_port: %s" % (self.dp_id,
-                             self.lsp_label
-                           self.dp_port)
+                             self.lsp_label,
+                             self.dp_port)
     
     def from_dict(self):
         load_from_dict(data, self, "dp_id")
         load_from_dict(data, self, "lsp_label")
         load_from_dict(data, self, "dp_port")
 
+    def to_dict(self):
+        data = {}
+        if self.id is not None:
+            data["_id"] = self.id
+        pack_into_dict(data, self, "dp_id")
+        pack_into_dict(data, self, "lsp_label")
+        pack_into_dict(data, self, "dp_port")
+        return data
+
+
 
 class RFLSPConfEntry:
     def __init__(self, dp_id=None, lsp_label=None, dp_port=None):
+        self.id = None
         self.dp_id = dp_id
         self.lsp_label = lsp_label
         self.dp_port = dp_port
@@ -353,13 +371,23 @@ class RFLSPConfEntry:
     def __str__(self):
         return "dp_id: %s\nlsp_label: %s\n"\
             "dp_port: %s" % (self.dp_id,
-                             self.lsp_label
+                             self.lsp_label,
                              self.dp_port)
     
     def from_dict(self):
+        self.id = data["_id"]
         load_from_dict(data, self, "dp_id")
         load_from_dict(data, self, "lsp_label")
         load_from_dict(data, self, "dp_port")
+
+    def to_dict(self):
+        data = {}
+        if self.id is not None:
+            data["_id"] = self.id
+        pack_into_dict(data, self, "dp_id")
+        pack_into_dict(data, self, "lsp_label")
+        pack_into_dict(data, self, "dp_port")
+        return data
 
 
 
