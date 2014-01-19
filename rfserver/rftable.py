@@ -101,6 +101,11 @@ class RFLSPConfig(EntryTable):
            return None
         return result[0]
 
+    def get_dp_entries(self, dp_id):
+        return self.get_entries(dp_id=dp_id)
+
+
+
 
 class RFTable(EntryTable):
     def __init__(self):
@@ -345,7 +350,8 @@ class RFLSPEntry:
                              self.lsp_label,
                              self.dp_port)
     
-    def from_dict(self):
+    def from_dict(self, data):
+        self.id = data["_id"]
         load_from_dict(data, self, "dp_id")
         load_from_dict(data, self, "lsp_label")
         load_from_dict(data, self, "dp_port")
@@ -374,7 +380,7 @@ class RFLSPConfEntry:
                              self.lsp_label,
                              self.dp_port)
     
-    def from_dict(self):
+    def from_dict(self, data):
         self.id = data["_id"]
         load_from_dict(data, self, "dp_id")
         load_from_dict(data, self, "lsp_label")
