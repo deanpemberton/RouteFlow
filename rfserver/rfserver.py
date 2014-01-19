@@ -96,6 +96,9 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
         elif action == REGISTER_ASSOCIATED:
             entry.associate(vm_id, vm_port, eth_addr=eth_addr)
             self.rftable.set_entry(entry)
+	    self.send_egress_lsp_message(config_entry.ct_id,
+                                         config_entry.dp_id,
+                                         config_entry.dp_port)
             self.log.info("Registering client port and associating to "
                           "datapath port (vm_id=%s, vm_port=%i, "
                           "eth_addr = %s, dp_id=%s, dp_port=%s)"
@@ -142,9 +145,12 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
                                                    ct_id=entry.ct_id)
                 entries.extend(self.isltable.get_entries(dp_id=entry.dp_id,
                                                          ct_id=entry.ct_id))
+
                 rm.add_option(Option.CT_ID(entry.ct_id))
 
                 self._send_rm_with_matches(rm, entry.dp_port, entries)
+
+
 
                 remote_dps = self.isltable.get_entries(rem_ct=entry.ct_id,
                                                        rem_id=entry.dp_id)
@@ -160,6 +166,9 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
                         entries = self.rftable.get_entries(dp_id=r.dp_id,
                                                            ct_id=r.ct_id)
                         self._send_rm_with_matches(rm, r.dp_port, entries)
+
+		
+
 
                 return
 
@@ -215,6 +224,9 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
         elif action == REGISTER_ASSOCIATED:
             entry.associate(dp_id, dp_port, ct_id)
             self.rftable.set_entry(entry)
+            self.send_egress_lsp_message(config_entry.ct_id,
+                                         config_entry.dp_id,
+                                         config_entry.dp_port)
             self.log.info("Registering datapath port and associating to "
                           "client port (dp_id=%s, dp_port=%i, vm_id=%s, "
                           "vm_port=%s)" % (format_id(dp_id), dp_port,
@@ -274,6 +286,24 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
                                                 dp_port, entry.ct_id,
                                                 format_id(entry.dp_id),
                                                 entry.dp_port))
+
+    def send_egress_lsp_message(self, ct_id, dp_id, dp_port):
+        rm = RouteMod(RMT_ADD, dp_id)
+        label = int(hex(dp_id).split('x')[1])
+        rm.set_id(int(dp_id))
+        rm.set_matches(None)
+        rm.add_match(Match.ETHERTYPE(0x8847))
+        rm.add_match(Match.MPLS(label))
+        rm.set_actions(None)
+        rm.add_action(Action.POP_MPLS())
+        rm.add_action(Action.OUTPUT(dp_port))
+        rm.set_options(None)
+        rm.add_option(Option.PRIORITY(PRIORITY_HIGH))
+        rm.add_option(Option.CT_ID(ct_id))
+        self.ipc.send(RFSERVER_RFPROXY_CHANNEL, str(ct_id), rm)
+
+
+
 
     def send_transit_lsp_message(self, ct_id, dp_id):
         rm = RouteMod(RMT_ADD, dp_id)
