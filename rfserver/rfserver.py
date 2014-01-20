@@ -148,26 +148,35 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
 
                 rm.add_option(Option.CT_ID(entry.ct_id))
 
-                self._send_rm_with_matches(rm, entry.dp_port, entries)
+                #self._send_rm_with_matches(rm, entry.dp_port, entries)
 
+		self.send_ingress_lsp_message(entry.ct_id, entry.dp_id, rm)
 
-
-                remote_dps = self.isltable.get_entries(rem_ct=entry.ct_id,
-                                                       rem_id=entry.dp_id)
-                for r in remote_dps:
-                    if r.get_status() == RFISL_ACTIVE:
-                        rm.set_options(rm.get_options()[:-1])
-                        rm.add_option(Option.CT_ID(r.ct_id))
-                        rm.set_id(int(r.dp_id))
-                        rm.set_actions(None)
-                        rm.add_action(Action.SET_ETH_SRC(r.eth_addr))
-                        rm.add_action(Action.SET_ETH_DST(r.rem_eth_addr))
-                        rm.add_action(Action.OUTPUT(r.dp_port))
-                        entries = self.rftable.get_entries(dp_id=r.dp_id,
-                                                           ct_id=r.ct_id)
-                        self._send_rm_with_matches(rm, r.dp_port, entries)
-
-		
+#
+#                remote_dps = self.isltable.get_entries(rem_ct=entry.ct_id,
+#                                                       rem_id=entry.dp_id)
+#                for r in remote_dps:
+#                    if r.get_status() == RFISL_ACTIVE:
+#                        rm.set_options(rm.get_options()[:-1])
+#                        rm.add_option(Option.CT_ID(r.ct_id))
+#                        rm.set_id(int(r.dp_id))
+#                        rm.set_actions(None)
+#                        rm.add_action(Action.SET_ETH_SRC(r.eth_addr))
+#                        rm.add_action(Action.SET_ETH_DST(r.rem_eth_addr))
+#                        rm.add_action(Action.OUTPUT(r.dp_port))
+#                        entries = self.rftable.get_entries(dp_id=r.dp_id,
+#                                                           ct_id=r.ct_id)
+#                        self._send_rm_with_matches(rm, r.dp_port, entries)
+#
+##			priority=16720,ip,
+#				in_port=3,
+#				dl_dst=12:a1:a1:a1:a3:01,
+#				nw_dst=10.1.2.2,
+#				actions=push_mpls:0x8847,
+#						set_field:14-\>mpls_label,
+#						set_field:12:a1:a1:a1:a3:02-\>eth_src,
+#						set_field:00:0d:b9:2a:c5:32-\>eth_dst,
+#						output:1		
 
 
                 return
@@ -303,7 +312,47 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
         self.ipc.send(RFSERVER_RFPROXY_CHANNEL, str(ct_id), rm)
 
 
+    def send_ingress_lsp_message(self, ct_id, dp_id, rm):
+        label = int(hex(dp_id).split('x')[1])
+        self.log.info("Installing Ingress LSP messages label=%s" % (label)) 
 
+
+        for i, match in enumerate(rm.matches):
+            if match['type'] is RFMT_IPV4:
+                match_output = Match.from_dict(match)
+                prefix = match_output.get_value()
+		subnet = prefix[0]
+		mask = prefix[1]
+        self.log.info("IP Address is =%s , %s" % (subnet, mask))
+
+
+        for i, action in enumerate(rm.actions):
+            if action['type'] is RFAT_SET_ETH_SRC:
+                action_output = Action.from_dict(action)
+                srcMac = action_output.get_value()
+	    elif action['type'] is RFAT_SET_ETH_DST:
+                action_output = Action.from_dict(action)
+                dstMac = action_output.get_value()
+        self.log.info("SrcMAC=%s, DstMAC=%s" % (srcMac, dstMac))
+
+        lsps = self.lspconf.get_entries()
+        for r in lsps:
+	    if r.dp_id != dp_id:
+		if r.lsp_label == label:
+                    self.log.info("Installing Ingress LSP on DPID=%s" % (r.dp_id))
+        	    rm_ingress = RouteMod(RMT_ADD, dp_id)
+	            rm.set_id(int(r.dp_id))
+                    rm.set_matches(None)
+		    rm.add_match(Match.IPV4(subnet,mask))
+                    rm.set_actions(None)
+                    rm.add_action(Action.SET_ETH_SRC(srcMac))
+                    rm.add_action(Action.SET_ETH_DST(dstMac))
+                    rm.add_action(Action.PUSH_MPLS(r.lsp_label))
+                    rm.add_action(Action.OUTPUT(r.dp_port))
+                    rm.set_options(None)
+                    rm.add_option(Option.PRIORITY(PRIORITY_HIGH))
+                    rm.add_option(Option.CT_ID(ct_id))
+                    self.ipc.send(RFSERVER_RFPROXY_CHANNEL, str(ct_id), rm)
 
     def send_transit_lsp_message(self, ct_id, dp_id):
         rm = RouteMod(RMT_ADD, dp_id)
@@ -314,7 +363,6 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
 	    rm.add_match(Match.ETHERTYPE(0x8847))
             rm.add_match(Match.MPLS(r.lsp_label))
             rm.set_actions(None)
-            rm.add_action(Action.PUSH_MPLS(r.lsp_label))
             rm.add_action(Action.OUTPUT(r.dp_port))
 	    rm.set_options(None)
             rm.add_option(Option.PRIORITY(PRIORITY_HIGH))
@@ -346,6 +394,7 @@ class RFServer(RFProtocolFactory, IPC.IPCMessageProcessor):
             elif operation_id == DC_ARP:
                 rm.add_match(Match.ETHERTYPE(ETHERTYPE_ARP))
             elif operation_id == DC_ICMP:
+                rm.add_option(Option.PRIORITY(PRIORITY_LOW))
                 rm.add_match(Match.ETHERTYPE(ETHERTYPE_IP))
                 rm.add_match(Match.NW_PROTO(IPPROTO_ICMP))
             elif operation_id == DC_ICMPV6:

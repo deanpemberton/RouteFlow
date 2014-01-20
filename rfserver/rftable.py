@@ -104,7 +104,8 @@ class RFLSPConfig(EntryTable):
     def get_dp_entries(self, dp_id):
         return self.get_entries(dp_id=dp_id)
 
-
+    def get_label_entries(self, label):
+	return self.get_entries(label=label)
 
 
 class RFTable(EntryTable):
